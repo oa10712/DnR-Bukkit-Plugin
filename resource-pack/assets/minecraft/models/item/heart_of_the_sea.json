@@ -1,0 +1,12 @@
+{
+	"parent": "item/generated",
+	"textures": {
+		"layer0": "item/heart_of_the_sea"
+	},
+	
+	"overrides": [
+		{"predicate": {"custom_model_data":1}, "model": "dnr:item/florynite_ore"},
+		{"predicate": {"custom_model_data":2}, "model": "dnr:item/orb_of_light"},
+		{"predicate": {"custom_model_data":3}, "model": "dnr:item/time_crystal"}
+	]
+}

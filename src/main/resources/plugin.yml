@@ -2,9 +2,3 @@ name: DnR-Bukkit-Plugin
 main: com.oddengames.minecraft.dnrbukkit.DnRBukkit
 api-version: 1.14
 version: 1
-commands:
-   basic:
-      description: This is a demo command.
-      usage: /<command> [player]
-      permission: dnrbukkit.basic
-      permission-message: You don't have <permission>

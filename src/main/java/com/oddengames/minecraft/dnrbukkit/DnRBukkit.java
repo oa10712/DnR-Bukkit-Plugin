@@ -15,8 +15,6 @@ import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.attribute.AttributeModifier.Operation;
 import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandSender;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -26,14 +24,16 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.inventory.CraftingInventory;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.MerchantRecipe;
+import org.bukkit.inventory.RecipeChoice;
 import org.bukkit.inventory.RecipeChoice.ExactChoice;
+import org.bukkit.inventory.RecipeChoice.MaterialChoice;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.PluginManager;
@@ -41,8 +41,24 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
+import com.oddengames.minecraft.dnrbukkit.CustomRecipe.EmptyChoice;
+
 public class DnRBukkit extends JavaPlugin implements Listener {
-	public static final HashMap<UUID, Long> cooldown_time_crystal = new HashMap<UUID, Long>();
+	public static final HashMap<UUID, Long> cooldown_time_crystal = new HashMap<>();
+
+	private static final int ID_TIME_CRYSTAL = 3;
+	private static final int ID_ORB = 2;
+	private static final int ID_BELL = 1;
+	private static final int ID_FLORYNITE_ORE = 1;
+	private static final int ID_GIRTHY_DIAMOND = 1;
+	private static final int ID_GIRTHY_IRON = 1;
+	private static final int ID_GIRTHY_GOLD = 1;
+	private static final int ID_RAW_SPIDER = 1;
+
+	private static final int TIME_CRYSTAL_COOLDOWN = 60;
+
+	ArrayList<CustomRecipe> smithingRecipies = new ArrayList<>();
+	ArrayList<CustomRecipe> fletchingRecipies = new ArrayList<>();
 
 	ArrayList<EntityType> etArr = new ArrayList<>();
 
@@ -53,60 +69,52 @@ public class DnRBukkit extends JavaPlugin implements Listener {
 	ItemStack girthyGoldSword = new ItemStack(Material.GOLDEN_SWORD, 1);
 	ItemStack orbOfLight = new ItemStack(Material.HEART_OF_THE_SEA, 1);
 	ItemStack timeCrystal = new ItemStack(Material.HEART_OF_THE_SEA, 1);
+	ItemStack rawSpider = new ItemStack(Material.SPIDER_EYE, 1);
+
 	DecimalFormat timeFormat = new DecimalFormat("0.0");
 
-	private static final int TIME_CRYSTAL_ID = 3;
-	private static final int ORB_ID = 2;
-	private static final int BELL_ID = 1;
-	private static final int FLORYNITE_ORE_ID = 1;
-	private static final int GIRTHY_DIAMOND_ID = 1;
-	private static final int GIRTHY_IRON_ID = 1;
-	private static final int GIRTHY_GOLD_ID = 1;
-
-	private static final int TIME_CRYSTAL_COOLDOWN = 60;
-
-	@Override
-	public void onEnable() {
-		// TODO Insert logic to be performed when the plugin is enabled
-		setupItems();
-		setupRecipies();
-		setupSchedulers();
-		setupArrays();
-
-		PluginManager manager = this.getServer().getPluginManager();
-		manager.registerEvents(this, this);
-	}
-
-	private void setupArrays() {
-		etArr.add(EntityType.DROWNED);
-		etArr.add(EntityType.HUSK);
-		etArr.add(EntityType.PHANTOM);
-		etArr.add(EntityType.PIG_ZOMBIE);
-		etArr.add(EntityType.SKELETON);
-		etArr.add(EntityType.SKELETON_HORSE);
-		etArr.add(EntityType.STRAY);
-		etArr.add(EntityType.WITHER_SKELETON);
-		etArr.add(EntityType.ZOMBIE);
-		etArr.add(EntityType.ZOMBIE_HORSE);
-		etArr.add(EntityType.ZOMBIE_VILLAGER);
-	}
-
-	private void setupSchedulers() {
-		getServer().getScheduler().scheduleSyncRepeatingTask(this, new Runnable() {
-			public void run() {
-				for (Player player : getServer().getOnlinePlayers()) {
-					if (player.getItemInHand().hasItemMeta()
-							&& player.getItemInHand().getItemMeta().getDisplayName().startsWith("Girthy")) {
-						player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_DIGGING, 80, 1, true));
+	private ItemStack getFletchingResult(CraftingInventory ci) {
+		for (CustomRecipe sr : fletchingRecipies) {
+			try {
+				RecipeChoice[] rc = sr.grid;
+				boolean fail = false;
+				for (int i = 0; i < 9; i++) {
+					if (!rc[i].test(ci.getMatrix()[i])) {
+						fail = true;
+						break;
 					}
 				}
+				if (!fail) {
+					return sr.getResult();
+				}
+			} catch (Exception ex) {
 			}
-		}, 1L, 20L);
+		}
+		return new ItemStack(Material.AIR);
 	}
 
-	public void onPlayerLogin(PlayerLoginEvent event) {
-		event.getPlayer().sendMessage(
-				"Welcome to the server! We strongly reccomend that you use the resource pack, as we have several custom items that depend on it.\nCheck out the online map at http://16colorgames.com:8124/");
+	private ItemStack getSmithingResult(CraftingInventory ci) {
+		for (CustomRecipe sr : smithingRecipies) {
+			try {
+				RecipeChoice[] rc = sr.grid;
+				boolean fail = false;
+				for (int i = 0; i < 9; i++) {
+					if (!rc[i].test(ci.getMatrix()[i])) {
+						fail = true;
+						break;
+					}
+				}
+				if (!fail) {
+					return sr.getResult();
+				}
+			} catch (Exception ex) {
+			}
+		}
+		return new ItemStack(Material.AIR);
+	}
+
+	private boolean isUndead(EntityType entityType) {
+		return etArr.contains(entityType);
 	}
 
 	@EventHandler(priority = EventPriority.LOW)
@@ -121,6 +129,59 @@ public class DnRBukkit extends JavaPlugin implements Listener {
 	}
 
 	@EventHandler
+	public void onCraftItem(PrepareItemCraftEvent e) {
+		if (e.getInventory().getLocation() != null
+				&& e.getInventory().getLocation().getBlock().getType() == Material.SMITHING_TABLE) {
+			e.getInventory().setResult(getSmithingResult(e.getInventory()));
+			return;
+		}
+		if (e.getInventory().getLocation() != null
+				&& e.getInventory().getLocation().getBlock().getType() == Material.FLETCHING_TABLE) {
+			e.getInventory().setResult(getFletchingResult(e.getInventory()));
+			return;
+		}
+		if (e.getRecipe() != null && e.getRecipe().getResult() != null) {
+			Material itemType = e.getRecipe().getResult().getType();
+			if (itemType == Material.CONDUIT && e.getInventory().getItem(5).hasItemMeta()
+					&& e.getInventory().getItem(5).getItemMeta().hasCustomModelData()) {
+				e.getInventory().setResult(new ItemStack(Material.AIR));
+			}
+		}
+	}
+
+	@Override
+	public void onDisable() {
+	}
+
+	@Override
+	public void onEnable() {
+		setupItems();
+		setupRecipies();
+		setupSchedulers();
+		setupArrays();
+
+		PluginManager manager = this.getServer().getPluginManager();
+		manager.registerEvents(this, this);
+	}
+
+	@EventHandler
+	public void onEntityDamage(EntityDamageByEntityEvent event) {
+		if (isUndead(event.getEntityType()) && event.getDamager() instanceof Player) {
+			if (((Player) event.getDamager()).getInventory().getItemInOffHand() != null && ((Player) event.getDamager())
+					.getInventory().getItemInOffHand().getItemMeta().hasCustomModelData()) {
+				event.setDamage(event.getDamage() + 3);
+			}
+		}
+	}
+
+	@EventHandler
+	public void onEntityDeath(EntityDeathEvent event) {
+		if (event.getEntityType() == EntityType.SPIDER || event.getEntityType() == EntityType.CAVE_SPIDER) {
+			event.getDrops().add(rawSpider.clone());
+		}
+	}
+
+	@EventHandler
 	public void onPlayerInteract(PlayerInteractEvent event) {
 		Player p = event.getPlayer();
 		if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
@@ -128,9 +189,14 @@ public class DnRBukkit extends JavaPlugin implements Listener {
 				event.getPlayer().openWorkbench(event.getClickedBlock().getLocation(), true);
 				event.setCancelled(true);
 			}
+			if (event.getClickedBlock().getType() == Material.FLETCHING_TABLE) {
+				event.getPlayer().openWorkbench(event.getClickedBlock().getLocation(), true);
+				event.setCancelled(true);
+			}
 		}
-		if (event.getItem().getType() == Material.HEART_OF_THE_SEA
-				&& event.getItem().getItemMeta().getCustomModelData() == TIME_CRYSTAL_ID
+		if (event.getItem() != null && event.getItem().getType() != null
+				&& event.getItem().getType() == Material.HEART_OF_THE_SEA
+				&& event.getItem().getItemMeta().getCustomModelData() == ID_TIME_CRYSTAL
 				&& (event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK)) {
 			if (cooldown_time_crystal.containsKey(p.getUniqueId())) {
 				double l = cooldown_time_crystal.get(p.getUniqueId());
@@ -158,37 +224,74 @@ public class DnRBukkit extends JavaPlugin implements Listener {
 		}
 	}
 
-	@EventHandler
-	public void onEntityDamage(EntityDamageByEntityEvent event) {
-		if (isUndead(event.getEntityType()) && event.getDamager() instanceof Player
-				&& ((Player) event.getDamager()).getInventory().getItemInOffHand() != null
-				&& ((Player) event.getDamager()).getInventory().getItemInOffHand().getItemMeta()
-						.getCustomModelData() == ORB_ID) {
-			event.setDamage(event.getDamage() + 3);
-		}
+	public void onPlayerLogin(PlayerLoginEvent event) {
+		event.getPlayer().sendMessage(
+				"Welcome to the server! We strongly reccomend that you use the resource pack, as we have several custom items that depend on it.\nCheck out the online map at http://16colorgames.com:8124/");
 	}
 
-	private boolean isUndead(EntityType entityType) {
-		return etArr.contains(entityType);
+	private void setupArrays() {
+		etArr.add(EntityType.DROWNED);
+		etArr.add(EntityType.HUSK);
+		etArr.add(EntityType.PHANTOM);
+		etArr.add(EntityType.PIG_ZOMBIE);
+		etArr.add(EntityType.SKELETON);
+		etArr.add(EntityType.SKELETON_HORSE);
+		etArr.add(EntityType.STRAY);
+		etArr.add(EntityType.WITHER_SKELETON);
+		etArr.add(EntityType.ZOMBIE);
+		etArr.add(EntityType.ZOMBIE_HORSE);
+		etArr.add(EntityType.ZOMBIE_VILLAGER);
 	}
 
-	@EventHandler
-	public void onCraftItem(PrepareItemCraftEvent e) {
-		if (e.getInventory().getLocation() != null
-				&& e.getInventory().getLocation().getBlock().getType() == Material.SMITHING_TABLE) {
-			e.getInventory().setResult(getSmithingResult(e.getInventory()));
-		}
-		if (e.getRecipe() != null && e.getRecipe().getResult() != null) {
-			Material itemType = e.getRecipe().getResult().getType();
-			if (itemType == Material.CONDUIT && e.getInventory().getItem(5).hasItemMeta()
-					&& e.getInventory().getItem(5).getItemMeta().hasCustomModelData()) {
-				e.getInventory().setResult(new ItemStack(Material.AIR));
-			}
-		}
-	}
+	private void setupItems() {
+		ItemMeta meta = bellVecna.getItemMeta();
+		meta.setCustomModelData(ID_BELL);
+		meta.setDisplayName("Bell of Vecna");
+		bellVecna.setItemMeta(meta);
 
-	private ItemStack getSmithingResult(CraftingInventory craftingInventory) {
-		return new ItemStack(Material.AIR);
+		meta = orbOfLight.getItemMeta();
+		meta.setCustomModelData(ID_ORB);
+		meta.setDisplayName("Orb of Light");
+		List<String> lore = new ArrayList<>();
+		lore.add("Bonus damage to undead when in offhand");
+		meta.setLore(lore);
+		orbOfLight.setItemMeta(meta);
+
+		meta = florynite_ore.getItemMeta();
+		meta.setCustomModelData(ID_FLORYNITE_ORE);
+		meta.setDisplayName("Florynite Ore");
+		florynite_ore.setItemMeta(meta);
+
+		meta = girthyDiamondSword.getItemMeta();
+		meta.setCustomModelData(ID_GIRTHY_DIAMOND);
+		meta.setDisplayName("Girthy Diamond Sword");
+		meta.addAttributeModifier(Attribute.GENERIC_ATTACK_DAMAGE,
+				new AttributeModifier(UUID.randomUUID(), "girthy", 10, Operation.ADD_NUMBER, EquipmentSlot.HAND));
+		girthyDiamondSword.setItemMeta(meta);
+
+		meta = girthyIronSword.getItemMeta();
+		meta.setCustomModelData(ID_GIRTHY_IRON);
+		meta.addAttributeModifier(Attribute.GENERIC_ATTACK_DAMAGE,
+				new AttributeModifier(UUID.randomUUID(), "girthy", 9, Operation.ADD_NUMBER, EquipmentSlot.HAND));
+		meta.setDisplayName("Girthy Iron Sword");
+		girthyIronSword.setItemMeta(meta);
+
+		meta = girthyGoldSword.getItemMeta();
+		meta.setCustomModelData(ID_GIRTHY_GOLD);
+		meta.addAttributeModifier(Attribute.GENERIC_ATTACK_DAMAGE,
+				new AttributeModifier(UUID.randomUUID(), "girthy", 7, Operation.ADD_NUMBER, EquipmentSlot.HAND));
+		meta.setDisplayName("Girthy Golden Sword");
+		girthyGoldSword.setItemMeta(meta);
+
+		meta = timeCrystal.getItemMeta();
+		meta.setCustomModelData(ID_TIME_CRYSTAL);
+		meta.setDisplayName("Time Displacement Crystal");
+		timeCrystal.setItemMeta(meta);
+
+		meta = rawSpider.getItemMeta();
+		meta.setCustomModelData(ID_RAW_SPIDER);
+		meta.setDisplayName("Raw Spider");
+		rawSpider.setItemMeta(meta);
 	}
 
 	private void setupRecipies() {
@@ -197,24 +300,6 @@ public class DnRBukkit extends JavaPlugin implements Listener {
 		bell.setIngredient('b', Material.BELL);
 		bell.setIngredient('f', new ExactChoice(florynite_ore));
 		Bukkit.addRecipe(bell);
-
-		ShapedRecipe girthyDiamond = new ShapedRecipe(new NamespacedKey(this, "girthyDiamond"), girthyDiamondSword);
-		girthyDiamond.shape("m", "m", "s");
-		girthyDiamond.setIngredient('s', Material.STICK);
-		girthyDiamond.setIngredient('m', Material.DIAMOND_BLOCK);
-		Bukkit.addRecipe(girthyDiamond);
-
-		ShapedRecipe girthyIron = new ShapedRecipe(new NamespacedKey(this, "girthyIron"), girthyIronSword);
-		girthyIron.shape("m", "m", "s");
-		girthyIron.setIngredient('s', Material.STICK);
-		girthyIron.setIngredient('m', Material.IRON_BLOCK);
-		Bukkit.addRecipe(girthyIron);
-
-		ShapedRecipe girthyGold = new ShapedRecipe(new NamespacedKey(this, "girthyGold"), girthyGoldSword);
-		girthyGold.shape("m", "m", "s");
-		girthyGold.setIngredient('s', Material.STICK);
-		girthyGold.setIngredient('m', Material.GOLD_BLOCK);
-		Bukkit.addRecipe(girthyGold);
 
 		ShapedRecipe orbRecipe = new ShapedRecipe(new NamespacedKey(this, "orbLight"), orbOfLight);
 		orbRecipe.shape("ggg", "ghg", "ggg");
@@ -228,77 +313,36 @@ public class DnRBukkit extends JavaPlugin implements Listener {
 		timeCrystalRecipe.setIngredient('c', Material.CLOCK);
 		Bukkit.addRecipe(timeCrystalRecipe);
 
-		MerchantRecipe mr;
+		CustomRecipe girthyDiamond = new CustomRecipe(girthyDiamondSword,
+				new RecipeChoice[][] { { new EmptyChoice(), new MaterialChoice(Material.DIAMOND) },
+						{ new MaterialChoice(Material.DIAMOND), new MaterialChoice(Material.DIAMOND_BLOCK),
+								new MaterialChoice(Material.DIAMOND) },
+						{ new EmptyChoice(), new MaterialChoice(Material.DIAMOND_SWORD) } });
+		smithingRecipies.add(girthyDiamond);
+
+		CustomRecipe girthyGold = new CustomRecipe(girthyGoldSword,
+				new RecipeChoice[][] { { new EmptyChoice(), new MaterialChoice(Material.GOLD_INGOT) },
+						{ new MaterialChoice(Material.GOLD_INGOT), new MaterialChoice(Material.GOLD_BLOCK),
+								new MaterialChoice(Material.GOLD_INGOT) },
+						{ new EmptyChoice(), new MaterialChoice(Material.GOLDEN_SWORD) } });
+		smithingRecipies.add(girthyGold);
+
+		CustomRecipe girthyIron = new CustomRecipe(girthyIronSword,
+				new RecipeChoice[][] { { new EmptyChoice(), new MaterialChoice(Material.IRON_INGOT) },
+						{ new MaterialChoice(Material.IRON_INGOT), new MaterialChoice(Material.IRON_BLOCK),
+								new MaterialChoice(Material.IRON_INGOT) },
+						{ new EmptyChoice(), new MaterialChoice(Material.IRON_SWORD) } });
+		smithingRecipies.add(girthyIron);
 	}
 
-	private void setupItems() {
-		ItemMeta meta = bellVecna.getItemMeta();
-		meta.setCustomModelData(BELL_ID);
-		meta.setDisplayName("Bell of Vecna");
-		bellVecna.setItemMeta(meta);
-
-		meta = orbOfLight.getItemMeta();
-		meta.setCustomModelData(ORB_ID);
-		meta.setDisplayName("Orb of Light");
-		List<String> lore = new ArrayList<>();
-		lore.add("Bonus damage to undead when in offhand");
-		meta.setLore(lore);
-		orbOfLight.setItemMeta(meta);
-
-		meta = florynite_ore.getItemMeta();
-		meta.setCustomModelData(FLORYNITE_ORE_ID);
-		meta.setDisplayName("Florynite Ore");
-		florynite_ore.setItemMeta(meta);
-
-		meta = girthyDiamondSword.getItemMeta();
-		meta.setCustomModelData(GIRTHY_DIAMOND_ID);
-		meta.setDisplayName("Girthy Diamond Sword");
-		meta.addAttributeModifier(Attribute.GENERIC_ATTACK_DAMAGE,
-				new AttributeModifier(UUID.randomUUID(), "girthy", 10, Operation.ADD_NUMBER, EquipmentSlot.HAND));
-		girthyDiamondSword.setItemMeta(meta);
-
-		meta = girthyIronSword.getItemMeta();
-		meta.setCustomModelData(GIRTHY_IRON_ID);
-		meta.addAttributeModifier(Attribute.GENERIC_ATTACK_DAMAGE,
-				new AttributeModifier(UUID.randomUUID(), "girthy", 9, Operation.ADD_NUMBER, EquipmentSlot.HAND));
-		meta.setDisplayName("Girthy Iron Sword");
-		girthyIronSword.setItemMeta(meta);
-
-		meta = girthyGoldSword.getItemMeta();
-		meta.setCustomModelData(GIRTHY_GOLD_ID);
-		meta.addAttributeModifier(Attribute.GENERIC_ATTACK_DAMAGE,
-				new AttributeModifier(UUID.randomUUID(), "girthy", 7, Operation.ADD_NUMBER, EquipmentSlot.HAND));
-		meta.setDisplayName("Girthy Golden Sword");
-		girthyGoldSword.setItemMeta(meta);
-
-		meta = timeCrystal.getItemMeta();
-		meta.setCustomModelData(TIME_CRYSTAL_ID);
-		meta.setDisplayName("Time Displacement Crystal");
-		timeCrystal.setItemMeta(meta);
-	}
-
-	@Override
-	public void onDisable() {
-	}
-
-	@Override
-	public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
-		if (cmd.getName().equalsIgnoreCase("basic")) {
-			if (sender instanceof Player) {
-				Player player = (Player) sender;
-				// do something
-				ItemStack stack = new ItemStack(Material.TOTEM_OF_UNDYING, 1);
-				ItemMeta meta = stack.getItemMeta();
-				meta.setCustomModelData(1);
-				meta.setDisplayName("Bell of Vecna");
-				stack.setItemMeta(meta);
-				player.getInventory().addItem(stack);
-				return true;
-			} else {
-				sender.sendMessage("You must be a player!");
-				return false;
+	private void setupSchedulers() {
+		getServer().getScheduler().scheduleSyncRepeatingTask(this, () -> {
+			for (Player player : getServer().getOnlinePlayers()) {
+				if (player.getItemInHand().hasItemMeta()
+						&& player.getItemInHand().getItemMeta().getDisplayName().startsWith("Girthy")) {
+					player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_DIGGING, 80, 1, true));
+				}
 			}
-		}
-		return false;
+		}, 1L, 20L);
 	}
 }
