@@ -18,6 +18,8 @@ import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
@@ -62,10 +64,20 @@ public class EventListener implements Listener {
 
 	@EventHandler
 	public void onEntityDamage(EntityDamageByEntityEvent event) {
-		if (plugin.isUndead(event.getEntityType()) && event.getDamager() instanceof Player) {
-			if (((Player) event.getDamager()).getInventory().getItemInOffHand() != null && ((Player) event.getDamager())
-					.getInventory().getItemInOffHand().getItemMeta().hasCustomModelData()) {
-				event.setDamage(event.getDamage() + 3);
+		if (event.getDamager() instanceof Player) {
+			Player p = ((Player) event.getDamager());
+			if (p.getInventory().getItemInOffHand() != null && p.getInventory().getItemInOffHand().hasItemMeta()) {
+				ItemMeta offMeta = p.getInventory().getItemInOffHand().getItemMeta();
+				if (plugin.isUndead(event.getEntityType())
+						&& offMeta.getPersistentDataContainer().has(plugin.orbKey, PersistentDataType.INTEGER)) {
+					event.setDamage(event.getDamage() + 3);
+				}
+			}
+			if (p.getInventory().getItemInMainHand() != null && p.getInventory().getItemInMainHand().hasItemMeta()) {
+				ItemMeta mainMeta = p.getInventory().getItemInMainHand().getItemMeta();
+				if (mainMeta.getPersistentDataContainer().has(plugin.girthyKey, PersistentDataType.INTEGER)) {
+					event.setDamage(event.getDamage() * DnRBukkit.GIRTHY_DAMAGE_MULT);
+				}
 			}
 		}
 	}

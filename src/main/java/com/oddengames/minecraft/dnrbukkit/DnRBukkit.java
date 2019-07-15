@@ -9,19 +9,16 @@ import java.util.UUID;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
-import org.bukkit.attribute.Attribute;
-import org.bukkit.attribute.AttributeModifier;
-import org.bukkit.attribute.AttributeModifier.Operation;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.CraftingInventory;
-import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.RecipeChoice;
 import org.bukkit.inventory.RecipeChoice.ExactChoice;
 import org.bukkit.inventory.RecipeChoice.MaterialChoice;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
@@ -42,6 +39,14 @@ public class DnRBukkit extends JavaPlugin {
 	public static final int ID_RAW_SPIDER = 1;
 
 	public static final int TIME_CRYSTAL_COOLDOWN = 60;
+
+	public static final double GIRTHY_DAMAGE_MULT = 1.25;
+	public static final String GIRTHY_LORE = "Deals +" + (GIRTHY_DAMAGE_MULT * 100 - 100) + "% damage";
+	public static final double LIGHT_ORB_BONUS = 3.0;
+
+	public static final String LIGHT_ORB_LORE = "Deals +" + LIGHT_ORB_BONUS + " damage to undead";
+	public NamespacedKey girthyKey = new NamespacedKey(this, "girthyItem");
+	public NamespacedKey orbKey = new NamespacedKey(this, "orbOfLight");
 
 	ArrayList<CustomRecipe> smithingRecipies = new ArrayList<>();
 	ArrayList<CustomRecipe> fletchingRecipies = new ArrayList<>();
@@ -142,7 +147,8 @@ public class DnRBukkit extends JavaPlugin {
 		meta.setCustomModelData(ID_ORB);
 		meta.setDisplayName("Orb of Light");
 		List<String> lore = new ArrayList<>();
-		lore.add("Bonus damage to undead when in offhand");
+		meta.getPersistentDataContainer().set(orbKey, PersistentDataType.INTEGER, 1);
+		lore.add(LIGHT_ORB_LORE);
 		meta.setLore(lore);
 		orbOfLight.setItemMeta(meta);
 
@@ -154,21 +160,27 @@ public class DnRBukkit extends JavaPlugin {
 		meta = girthyDiamondSword.getItemMeta();
 		meta.setCustomModelData(ID_GIRTHY_DIAMOND);
 		meta.setDisplayName("Girthy Diamond Sword");
-		meta.addAttributeModifier(Attribute.GENERIC_ATTACK_DAMAGE,
-				new AttributeModifier(UUID.randomUUID(), "girthy", 10, Operation.ADD_NUMBER, EquipmentSlot.HAND));
+		lore = new ArrayList<>();
+		lore.add(GIRTHY_LORE);
+		meta.setLore(lore);
+		meta.getPersistentDataContainer().set(girthyKey, PersistentDataType.INTEGER, 1);
 		girthyDiamondSword.setItemMeta(meta);
 
 		meta = girthyIronSword.getItemMeta();
 		meta.setCustomModelData(ID_GIRTHY_IRON);
-		meta.addAttributeModifier(Attribute.GENERIC_ATTACK_DAMAGE,
-				new AttributeModifier(UUID.randomUUID(), "girthy", 9, Operation.ADD_NUMBER, EquipmentSlot.HAND));
+		lore = new ArrayList<>();
+		lore.add(GIRTHY_LORE);
+		meta.setLore(lore);
+		meta.getPersistentDataContainer().set(girthyKey, PersistentDataType.INTEGER, 1);
 		meta.setDisplayName("Girthy Iron Sword");
 		girthyIronSword.setItemMeta(meta);
 
 		meta = girthyGoldSword.getItemMeta();
 		meta.setCustomModelData(ID_GIRTHY_GOLD);
-		meta.addAttributeModifier(Attribute.GENERIC_ATTACK_DAMAGE,
-				new AttributeModifier(UUID.randomUUID(), "girthy", 7, Operation.ADD_NUMBER, EquipmentSlot.HAND));
+		lore = new ArrayList<>();
+		lore.add(GIRTHY_LORE);
+		meta.setLore(lore);
+		meta.getPersistentDataContainer().set(girthyKey, PersistentDataType.INTEGER, 1);
 		meta.setDisplayName("Girthy Golden Sword");
 		girthyGoldSword.setItemMeta(meta);
 
@@ -227,14 +239,12 @@ public class DnRBukkit extends JavaPlugin {
 	private void setupSchedulers() {
 		getServer().getScheduler().scheduleSyncRepeatingTask(this, () -> {
 			for (Player player : getServer().getOnlinePlayers()) {
-				if (player.getItemInHand().hasItemMeta()
-						&& player.getItemInHand().getItemMeta().getDisplayName().startsWith("Girthy")) {
+				if (player.getItemInHand().hasItemMeta() && player.getItemInHand().getItemMeta()
+						.getPersistentDataContainer().get(girthyKey, PersistentDataType.INTEGER) != null) {
 					player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_DIGGING, 80, 1, true));
 				}
 			}
 		}, 1L, 20L);
 	}
-
-
 
 }
