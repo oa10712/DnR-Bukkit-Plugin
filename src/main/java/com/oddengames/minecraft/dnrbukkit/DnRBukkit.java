@@ -7,27 +7,13 @@ import java.util.List;
 import java.util.UUID;
 
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.attribute.AttributeModifier.Operation;
-import org.bukkit.block.Biome;
-import org.bukkit.block.Block;
 import org.bukkit.entity.EntityType;
-import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
-import org.bukkit.event.block.Action;
-import org.bukkit.event.block.BlockBreakEvent;
-import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.entity.EntityDeathEvent;
-import org.bukkit.event.inventory.PrepareItemCraftEvent;
-import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.inventory.CraftingInventory;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
@@ -43,19 +29,19 @@ import org.bukkit.potion.PotionEffectType;
 
 import com.oddengames.minecraft.dnrbukkit.CustomRecipe.EmptyChoice;
 
-public class DnRBukkit extends JavaPlugin implements Listener {
+public class DnRBukkit extends JavaPlugin {
 	public static final HashMap<UUID, Long> cooldown_time_crystal = new HashMap<>();
 
-	private static final int ID_TIME_CRYSTAL = 3;
-	private static final int ID_ORB = 2;
-	private static final int ID_BELL = 1;
-	private static final int ID_FLORYNITE_ORE = 1;
-	private static final int ID_GIRTHY_DIAMOND = 1;
-	private static final int ID_GIRTHY_IRON = 1;
-	private static final int ID_GIRTHY_GOLD = 1;
-	private static final int ID_RAW_SPIDER = 1;
+	public static final int ID_TIME_CRYSTAL = 3;
+	public static final int ID_ORB = 2;
+	public static final int ID_BELL = 1;
+	public static final int ID_FLORYNITE_ORE = 1;
+	public static final int ID_GIRTHY_DIAMOND = 1;
+	public static final int ID_GIRTHY_IRON = 1;
+	public static final int ID_GIRTHY_GOLD = 1;
+	public static final int ID_RAW_SPIDER = 1;
 
-	private static final int TIME_CRYSTAL_COOLDOWN = 60;
+	public static final int TIME_CRYSTAL_COOLDOWN = 60;
 
 	ArrayList<CustomRecipe> smithingRecipies = new ArrayList<>();
 	ArrayList<CustomRecipe> fletchingRecipies = new ArrayList<>();
@@ -73,7 +59,7 @@ public class DnRBukkit extends JavaPlugin implements Listener {
 
 	DecimalFormat timeFormat = new DecimalFormat("0.0");
 
-	private ItemStack getFletchingResult(CraftingInventory ci) {
+	public ItemStack getFletchingResult(CraftingInventory ci) {
 		for (CustomRecipe sr : fletchingRecipies) {
 			try {
 				RecipeChoice[] rc = sr.grid;
@@ -93,7 +79,7 @@ public class DnRBukkit extends JavaPlugin implements Listener {
 		return new ItemStack(Material.AIR);
 	}
 
-	private ItemStack getSmithingResult(CraftingInventory ci) {
+	public ItemStack getSmithingResult(CraftingInventory ci) {
 		for (CustomRecipe sr : smithingRecipies) {
 			try {
 				RecipeChoice[] rc = sr.grid;
@@ -113,40 +99,8 @@ public class DnRBukkit extends JavaPlugin implements Listener {
 		return new ItemStack(Material.AIR);
 	}
 
-	private boolean isUndead(EntityType entityType) {
+	public boolean isUndead(EntityType entityType) {
 		return etArr.contains(entityType);
-	}
-
-	@EventHandler(priority = EventPriority.LOW)
-	public void onBlockBreak(final BlockBreakEvent e) {
-		Block block = e.getBlock();
-		if (block.getType() == Material.IRON_ORE && (block.getBiome() == Biome.COLD_OCEAN
-				|| block.getBiome() == Biome.DEEP_COLD_OCEAN || block.getBiome() == Biome.DEEP_FROZEN_OCEAN
-				|| block.getBiome() == Biome.FROZEN_OCEAN || block.getBiome() == Biome.FROZEN_RIVER)) {
-			e.setDropItems(false);
-			block.getWorld().dropItem(block.getLocation(), florynite_ore);
-		}
-	}
-
-	@EventHandler
-	public void onCraftItem(PrepareItemCraftEvent e) {
-		if (e.getInventory().getLocation() != null
-				&& e.getInventory().getLocation().getBlock().getType() == Material.SMITHING_TABLE) {
-			e.getInventory().setResult(getSmithingResult(e.getInventory()));
-			return;
-		}
-		if (e.getInventory().getLocation() != null
-				&& e.getInventory().getLocation().getBlock().getType() == Material.FLETCHING_TABLE) {
-			e.getInventory().setResult(getFletchingResult(e.getInventory()));
-			return;
-		}
-		if (e.getRecipe() != null && e.getRecipe().getResult() != null) {
-			Material itemType = e.getRecipe().getResult().getType();
-			if (itemType == Material.CONDUIT && e.getInventory().getItem(5).hasItemMeta()
-					&& e.getInventory().getItem(5).getItemMeta().hasCustomModelData()) {
-				e.getInventory().setResult(new ItemStack(Material.AIR));
-			}
-		}
 	}
 
 	@Override
@@ -161,72 +115,7 @@ public class DnRBukkit extends JavaPlugin implements Listener {
 		setupArrays();
 
 		PluginManager manager = this.getServer().getPluginManager();
-		manager.registerEvents(this, this);
-	}
-
-	@EventHandler
-	public void onEntityDamage(EntityDamageByEntityEvent event) {
-		if (isUndead(event.getEntityType()) && event.getDamager() instanceof Player) {
-			if (((Player) event.getDamager()).getInventory().getItemInOffHand() != null && ((Player) event.getDamager())
-					.getInventory().getItemInOffHand().getItemMeta().hasCustomModelData()) {
-				event.setDamage(event.getDamage() + 3);
-			}
-		}
-	}
-
-	@EventHandler
-	public void onEntityDeath(EntityDeathEvent event) {
-		if (event.getEntityType() == EntityType.SPIDER || event.getEntityType() == EntityType.CAVE_SPIDER) {
-			event.getDrops().add(rawSpider.clone());
-		}
-	}
-
-	@EventHandler
-	public void onPlayerInteract(PlayerInteractEvent event) {
-		Player p = event.getPlayer();
-		if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
-			if (event.getClickedBlock().getType() == Material.SMITHING_TABLE) {
-				event.getPlayer().openWorkbench(event.getClickedBlock().getLocation(), true);
-				event.setCancelled(true);
-			}
-			if (event.getClickedBlock().getType() == Material.FLETCHING_TABLE) {
-				event.getPlayer().openWorkbench(event.getClickedBlock().getLocation(), true);
-				event.setCancelled(true);
-			}
-		}
-		if (event.getItem() != null && event.getItem().getType() != null
-				&& event.getItem().getType() == Material.HEART_OF_THE_SEA
-				&& event.getItem().getItemMeta().getCustomModelData() == ID_TIME_CRYSTAL
-				&& (event.getAction() == Action.RIGHT_CLICK_AIR || event.getAction() == Action.RIGHT_CLICK_BLOCK)) {
-			if (cooldown_time_crystal.containsKey(p.getUniqueId())) {
-				double l = cooldown_time_crystal.get(p.getUniqueId());
-				double i = TIME_CRYSTAL_COOLDOWN * 1000;
-				double c = System.currentTimeMillis();
-				if (l + i > c) {
-					event.setCancelled(true);
-					double x = (l + i - c) / 1000;
-					p.sendMessage(ChatColor
-							.translateAlternateColorCodes('&',
-									"&3You must wait &c<time> &3seconds before using that again!")
-							.replace("<time>", timeFormat.format(x)));
-					return;
-				}
-			}
-			cooldown_time_crystal.put(p.getUniqueId(), System.currentTimeMillis());
-			p.getNearbyEntities(20, 20, 20).forEach((e) -> {
-				if (e instanceof LivingEntity) {
-					LivingEntity le = (LivingEntity) e;
-					le.addPotionEffect(new PotionEffect(PotionEffectType.SLOW, 400, 1));
-				}
-			});
-			p.removePotionEffect(PotionEffectType.SLOW);
-			p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 400, 1));
-		}
-	}
-
-	public void onPlayerLogin(PlayerLoginEvent event) {
-		event.getPlayer().sendMessage(
-				"Welcome to the server! We strongly reccomend that you use the resource pack, as we have several custom items that depend on it.\nCheck out the online map at http://16colorgames.com:8124/");
+		manager.registerEvents(new EventListener(this), this);
 	}
 
 	private void setupArrays() {
@@ -345,4 +234,7 @@ public class DnRBukkit extends JavaPlugin implements Listener {
 			}
 		}, 1L, 20L);
 	}
+
+
+
 }
